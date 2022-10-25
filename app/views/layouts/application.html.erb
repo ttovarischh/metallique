@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Digital Trip</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <%= csrf_meta_tags %>
+    <%= csp_meta_tag %>
+
+    <%= stylesheet_link_tag "application", media: 'all', "data-turbo-track": "reload" %>
+    <%= stylesheet_link_tag "All", media: 'all', "data-turbo-track": "reload" %>
+    <%= stylesheet_link_tag "colors", media: 'all', "data-turbo-track": "reload" %>
+    <%= javascript_pack_tag "SynthView" %>
+  </head>
+
+  <body>
+  <%= yield %>
+  </body>
+</html>
