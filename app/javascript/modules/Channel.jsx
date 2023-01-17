@@ -1,17 +1,28 @@
-import React, { Component } from 'react'
-import SC_Slider from '../components/SC_Slider.jsx'
+import React, { Component } from "react";
 
+import SC_ToggleButton from "../components/SC_ToggleButton.jsx";
+import SC_Slider from "../components/SC_Slider.jsx";
+import SC_Knob from "../components/SC_Knob.jsx";
 
-export default class Channel extends Component {
+export default class ToneSynth extends Component {
   constructor(props) {
-    super(props)
+    super(props);
   }
 
   render() {
-    const { settings, handleValueChange } = this.props
+    const { settings, handleValueChange } = this.props;
 
     return (
-      <div className="sliderwrapper">
+      // className={`Modal ${add}`}
+      <div className={`Channel ${settings.channel.mute ? 'silent' : 'loud'}`}>
+        <SC_ToggleButton
+          text=""
+          isOn={settings.channel.mute}
+          handleClick={() =>
+            handleValueChange("channelMute", !settings.channel.mute)
+          }
+        />
+        <p className="Decor">min</p>
         <SC_Slider
           name="Channel Volume"
           min={-60}
@@ -21,7 +32,8 @@ export default class Channel extends Component {
           property="channelVolume"
           handleChange={handleValueChange}
         />
+        <p className="Decor">max</p>
       </div>
-    )
+    );
   }
 }

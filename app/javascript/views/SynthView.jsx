@@ -1,567 +1,609 @@
 import * as Tone from "tone";
 import React, { Component } from "react";
 
-import Play from "../modules/Play.jsx";
-import Pan from "../modules/Pan.jsx";
-import Delay from "../modules/Delay.jsx";
-import Reverb from "../modules/Reverb.jsx";
-import Envelope from "../modules/Envelope.jsx";
-import Chorus from "../modules/Chorus.jsx";
 import Modal from "../view_components/Modal.jsx";
-import Channel from "../modules/Channel.jsx";
-import EffectsWrapper from "../view_components/EffectsWrapper.jsx";
-import ToneSynth from "../modules/ToneSynth.jsx";
-import Chebyschev from "../modules/Chebyschev.jsx";
-import Vibrato from "../modules/Vibrato.jsx";
-import FeedbackDelay from "../modules/FeedbackDelay";
-import Distortion from "../modules/Distortion";
+import PPDView from "../view_components/PPDView.jsx";
 
-import * as drumsSettings from "../tunes/drums.js";
-import * as seaSettings from "../tunes/sea.js";
-import * as georgianSettings from "../tunes/georgian.js";
+import * as bassSettings from "../tunes/bass.js";
 import * as melodySettings from "../tunes/melody.js";
-import * as glSettings from "../tunes/gl.js";
-import * as treeSettings from "../tunes/tree.js";
-import * as apSettings from "../tunes/ap.js";
-import * as alSettings from "../tunes/al.js";
-import * as melody2Settings from "../tunes/melody2.js";
-import * as windSettings from "../tunes/wind.js";
-import * as ilSettings from "../tunes/il.js";
-import * as ipSettings from "../tunes/ip.js";
-import * as melody3Settings from "../tunes/melody3.js";
+import * as drumsSettings from "../tunes/drums.js";
 
-let seasamplerChannel;
-let georgiansamplerChannel;
-let glChannel;
-let treeChannel;
-let apChannel;
-let melodyChannel;
-let alChannel;
-let melody2Channel;
-let windChannel;
-let ilChannel;
-let ipChannel;
-let melody3Channel;
-let seasamplerPingPongDelay;
-let georgiansamplerChorus;
-let georgiansamplerPingPongDelay;
-let ipChorus;
-let ipPingPongDelay;
-let treePingPongDelay;
-let apPingPongDelay;
-let apDistortion;
-let glReverb;
-let glChebyshev;
-let glVibrato;
+import ToneSynth from "../modules/ToneSynth.jsx";
+import DistortionEffect from "../modules/DistortionEffect.jsx";
+import BitCrusherEffect from "../modules/BitCrusherEffect.jsx";
+import VibratoEffect from "../modules/VibratoEffect.jsx";
+import PingPongDelayEffect from "../modules/PingPongDelayEffect.jsx";
+import Channel from "../modules/Channel.jsx";
+
+import SC_ToggleButtonSet from "../components/SC_ToggleButtonSet.jsx";
+import SC_ToggleButton from "../components/SC_ToggleButton";
+import SC_Button from "../components/SC_Button";
+import SC_Slider from "../components/SC_Slider";
+import Select from "../components/Select";
+import Surface from "../components/Surface.jsx";
+
+let bassSynth;
+let bassChorus;
+let bassDistortion;
+let bassBitCrusher;
+let bassPingPongDelay;
+let bassPart;
+let bassChannel;
+
 let melodySynth;
 let melodyChorus;
+let melodyDistortion;
+let melodyBitCrusher;
 let melodyPingPongDelay;
-let melody2Synth;
-let melody2Chorus;
-let melody2PingPongDelay;
-let melody3Synth;
-let melody3Chorus;
-let melody3PingPongDelay;
-let melody3Distortion;
-let alReverb;
-let alFeedbackDelay;
-let alVibrato;
-let ilReverb;
-let ilChebyshev;
-let ilChorus;
-let windPingPongDelay;
+let melodyPart;
+let melody;
+let melodyChannel;
+
+let sampler;
+let samplerChannel;
+let drumsPingPongDelay;
+let drumsVibrato;
 
 export default class Container extends Component {
   constructor(props) {
     super(props);
 
     this.state = {
-      drumsSettings,
-      seaSettings,
-      georgianSettings,
+      pOpened: true,
+      vOpened: false,
+      dOpened: true,
+      bOpened: false,
+      isStarted: false,
+      isUIShown: true,
+      bpm: 80,
+      melodyChangeMeasureSelect: false,
+      melodyChangeMeasure: 8,
+      melodyChangeRandom: false,
+      melodyChange: false,
+      random: false,
+      bassSettings,
       melodySettings,
-      glSettings,
-      treeSettings,
-      apSettings,
-      alSettings,
-      melody2Settings,
-      windSettings,
-      ilSettings,
-      ipSettings,
-      melody3Settings,
+      drumsSettings,
     };
   }
 
-  handleFirstStart = () => {
-    const { seaSettings } = this.state;
-    const seasampler = new Tone.Sampler({
-      urls: {
-        A1: "ocean.mp3",
-        A2: "seagull.mp3",
-        A3: "00019-Linn-9000-Stick.mp3",
-      },
-      baseUrl: "http://localhost:3000/samples/",
+  componentDidMount() {
+    document.addEventListener("keydown", this.handleKeydown);
+
+    document.addEventListener(
+      "click",
+      this.handleMelodyChangeMeasureSelectClose
+    );
+  }
+
+  shuffle = (array) => {
+    let currentIndex = array.length,
+      randomIndex;
+
+    while (currentIndex != 0) {
+      randomIndex = Math.floor(Math.random() * currentIndex);
+      currentIndex--;
+
+      // prettier-ignore
+      [array[currentIndex], array[randomIndex]] = [
+        array[randomIndex],
+        array[currentIndex],
+      ];
+    }
+
+    return array;
+  };
+
+  handleToggle = () => {
+    const { pOpened, vOpened } = this.state;
+
+    this.setState({
+      pOpened: !pOpened,
+      vOpened: !vOpened,
     });
+  };
 
-    seasamplerChannel = new Tone.Channel(seaSettings.channel);
+  handleSecondToggle = () => {
+    const { dOpened, bOpened } = this.state;
 
-    seasamplerPingPongDelay = new Tone.PingPongDelay(
-      seaSettings.pingPongDelay
+    this.setState({
+      dOpened: !dOpened,
+      bOpened: !bOpened,
+    });
+  };
+
+  handleMelodyChangeMeasureSelectClose = (e) => {
+    if (e.target.classList[0] != "currentValue") {
+      this.setState({
+        melodyChangeMeasureSelect: false,
+      });
+    }
+  };
+
+  handleMelodyChangeMeasureSelectOpen = () => {
+    this.setState({
+      melodyChangeMeasureSelect: true,
+    });
+  };
+
+  handleMelodyChangeMeasure = (property, value) => {
+    this.setState({
+      melodyChangeMeasureSelect: false,
+      melodyChangeMeasure: value,
+    });
+  };
+
+  handleMelodyChangeRandom = () => {
+    const { melodyChangeRandom } = this.state;
+
+    this.setState({
+      melodyChangeRandom: !melodyChangeRandom,
+    });
+  };
+
+  handleMelodyChange = () => {
+    const { melodyChange } = this.state;
+
+    this.setState({
+      melodyChange: !melodyChange,
+    });
+  };
+
+  handleKeydown = (e) => {
+    console.log(e.key, e.code, e.keyCode);
+
+    switch (e.keyCode) {
+      case 49:
+        this.handleMelodySequenceChange("", "tapping");
+        break;
+      case 50:
+        this.handleMelodySequenceChange("", "grind");
+        break;
+      case 81:
+        sampler.triggerAttackRelease("A3", "1n");
+        break;
+    }
+  };
+
+  handleStart = () => {
+    const { bassSettings, melodySettings, drumsSettings } = this.state;
+
+    bassSynth = new Tone.Synth(bassSettings.synth);
+    bassChorus = new Tone.Chorus(bassSettings.chorus).start();
+
+    bassDistortion = new Tone.Distortion(bassSettings.distortion);
+    bassBitCrusher = new Tone.BitCrusher(bassSettings.bitCrusher);
+
+    bassPingPongDelay = new Tone.PingPongDelay(
+      bassSettings.pingPongDelay
     ).toDestination();
 
-    seasampler.chain(seasamplerChannel, seasamplerPingPongDelay);
+    bassChannel = new Tone.Channel(bassSettings.channel).toDestination();
 
-    const seaPart = new Tone.Part((time, note) => {
-      seasampler.triggerAttackRelease(
-        note.noteName,
-        note.duration,
-        time,
-        note.velocity
-      );
-    }, seaSettings.sequence.steps).start(0);
-
-    seaPart.loopEnd = seaSettings.sequence.duration;
-    seaPart.loop = true;
-
-    Tone.start();
-    Tone.Transport.start();
-  };
-
-  handleSecondStart = () => {
-    const { georgianSettings } = this.state;
-    const georgiansampler = new Tone.Sampler({
-      urls: {
-        A1: "sud.mp3",
-      },
-      baseUrl: "http://localhost:3000/samples/",
-    });
-
-    georgiansamplerChannel = new Tone.Channel(georgianSettings.channel);
-
-    georgiansamplerPingPongDelay = new Tone.PingPongDelay(
-      georgianSettings.pingPongDelay
-    );
-    georgiansamplerChorus = new Tone.Chorus(
-      georgianSettings.chorus
-    ).toDestination();
-
-    georgiansampler.chain(
-      georgiansamplerChannel,
-      georgiansamplerPingPongDelay,
-      georgiansamplerChorus
+    bassSynth.chain(
+      bassChannel,
+      bassChorus,
+      bassPingPongDelay,
+      bassDistortion,
+      bassBitCrusher
     );
 
-    const georgianPart = new Tone.Part((time, note) => {
-      georgiansampler.triggerAttackRelease(
+    bassPart = new Tone.Part((time, note) => {
+      bassSynth.triggerAttackRelease(
         note.noteName,
         note.duration,
         time,
         note.velocity
       );
-    }, georgianSettings.sequence.steps).start(0);
+    }, bassSettings.sequence.steps1).start(0);
 
-    georgianPart.loopEnd = georgianSettings.sequence.duration;
-    georgianPart.loop = true;
-  };
+    bassPart.loopEnd = bassSettings.sequence.duration;
+    bassPart.loop = bassSettings.sequence.loop;
 
-  handleThirdStart = () => {
-    const { glSettings } = this.state;
-    const glsampler = new Tone.Sampler({
-      urls: {
-        A1: "gorg.mp3",
-        A2: "gorg2.mp3",
-      },
-      baseUrl: "http://localhost:3000/samples/",
-    });
-
-    glChannel = new Tone.Channel(glSettings.channel);
-    glChebyshev = new Tone.Chebyshev(glSettings.chebyshev);
-    glVibrato = new Tone.Vibrato(glSettings.vibrato);
-    glReverb = new Tone.Reverb(glSettings.reverb).toDestination();
-
-    glsampler.chain(glChannel, glVibrato, glChebyshev, glReverb);
-
-    const glPart = new Tone.Part((time, note) => {
-      glsampler.triggerAttackRelease(
-        note.noteName,
-        note.duration,
-        time,
-        note.velocity
-      );
-    }, glSettings.sequence.steps).start(0);
-
-    glPart.loopEnd = glSettings.sequence.duration;
-    glPart.loop = true;
-  };
-
-  handleFourthStart = () => {
-    const { melodySettings } = this.state;
     melodySynth = new Tone.Synth(melodySettings.synth);
-
-    melodyChannel = new Tone.Channel(melodySettings.channel);
     melodyChorus = new Tone.Chorus(melodySettings.chorus).start();
+    melodyDistortion = new Tone.Distortion(melodySettings.distortion);
+    melodyBitCrusher = new Tone.BitCrusher(melodySettings.bitCrusher);
+
     melodyPingPongDelay = new Tone.PingPongDelay(
       melodySettings.pingPongDelay
     ).toDestination();
 
-    melodySynth.chain(melodyChannel, melodyChorus, melodyPingPongDelay);
+    melodyChannel = new Tone.Channel(melodySettings.channel).toDestination();
 
-    const melodyPart = new Tone.Part((time, note) => {
+    melodySynth.chain(
+      melodyChorus,
+      melodyDistortion,
+      melodyBitCrusher,
+      melodyPingPongDelay,
+      melodyChannel
+    );
+
+    melodyPart = new Tone.Part((time, note) => {
       melodySynth.triggerAttackRelease(
         note.noteName,
         note.duration,
         time,
         note.velocity
       );
-    }, melodySettings.sequence.steps).start(0);
+    }, melodySettings.sequence[melodySettings.sequence.current]).start(0);
 
     melodyPart.loopEnd = melodySettings.sequence.duration;
-    melodyPart.loop = true;
-  };
+    melodyPart.loop = melodySettings.sequence.loop;
 
-  handleFiveStart = () => {
-    const { treeSettings } = this.state;
-    const treesampler = new Tone.Sampler({
+    sampler = new Tone.Sampler({
       urls: {
-        A1: "list.mp3",
+        A1: "1.mp3",
+        A2: "2.mp3",
+        A3: "3.mp3",
+        A4: "4.mp3",
+        C1: "bellthree.mp3",
+        C2: "3.mp3",
+        C3: "2.mp3",
+        C4: "1.mp3",
+        E1: "3.mp3",
+        E2: "1.mp3",
+        E3: "1.mp3",
+        E4: "2.mp3",
       },
       baseUrl: "http://localhost:3000/samples/",
     });
 
-    treeChannel = new Tone.Channel(treeSettings.channel);
-    treePingPongDelay = new Tone.PingPongDelay(
-      treeSettings.pingPongDelay
+    drumsPingPongDelay = new Tone.PingPongDelay(
+      drumsSettings.pingPongDelay
     ).toDestination();
 
-    treesampler.chain(treeChannel, treePingPongDelay);
+    drumsVibrato = new Tone.Vibrato(drumsSettings.vibrato);
 
-    const treePart = new Tone.Part((time, note) => {
-      treesampler.triggerAttackRelease(
+    samplerChannel = new Tone.Channel(drumsSettings.channel).toDestination();
+
+    sampler.chain(samplerChannel, drumsPingPongDelay, drumsVibrato);
+
+    const drumsPart = new Tone.Part((time, note) => {
+      sampler.triggerAttackRelease(
         note.noteName,
         note.duration,
         time,
         note.velocity
       );
-    }, treeSettings.sequence.steps).start(0);
+    }, drumsSettings.sequence.steps).start(0);
 
-    treePart.loopEnd = treeSettings.sequence.duration;
-    treePart.loop = true;
+    drumsPart.loopEnd = drumsSettings.sequence.duration;
+    drumsPart.loop = drumsSettings.sequence.loop;
+
+    this.handleTransportChange("play", true);
   };
 
-  handleSixStart = () => {
-    const { apSettings } = this.state;
-    const apsampler = new Tone.Sampler({
-      urls: {
-        A1: "ura.mp3",
-      },
-      baseUrl: "http://localhost:3000/samples/",
-    });
+  nextMeasure = () => {
+    const { melodyChangeMeasure, melodyChangeRandom, melodyChange } =
+      this.state;
 
-    apChannel = new Tone.Channel(apSettings.channel);
-    apDistortion = new Tone.Distortion(apSettings.distortion);
-    apPingPongDelay = new Tone.PingPongDelay(
-      apSettings.pingPongDelay
-    ).toDestination();
+    if (melodyChange) {
+      const position = Tone.Transport.position;
+      const regexBefore = /([\w]+)/;
+      let measure = parseInt(position.match(regexBefore)[1]) + 1;
+      console.log("next measure", measure);
 
-    apsampler.chain(apChannel, apDistortion, apPingPongDelay);
+      const squaresPassed = Math.floor(measure / melodyChangeMeasure);
 
-    const apPart = new Tone.Part((time, note) => {
-      apsampler.triggerAttackRelease(
-        note.noteName,
-        note.duration,
-        time,
-        note.velocity
-      );
-    }, apSettings.sequence.steps).start(0);
+      if (
+        measure == melodyChangeMeasure ||
+        measure - squaresPassed * melodyChangeMeasure == 0
+      ) {
+        console.log("change");
+        melodyPart.clear();
 
-    apPart.loopEnd = apSettings.sequence.duration;
-    apPart.loop = true;
+        if (melodyChangeRandom) {
+          console.log("random");
+
+          let notes = [];
+
+          melodySettings.sequence.grind.forEach((item, i) => {
+            notes.push(item.noteName);
+          });
+
+          notes = this.shuffle(notes);
+
+          let randomizedSequence = [...melodySettings.sequence.grind];
+
+          randomizedSequence.forEach((step, i) => {
+            let newStep = Object.assign({}, step);
+            newStep.noteName = notes[i];
+            melodyPart.add(newStep);
+          });
+        } else {
+          melodySettings.sequence.grind.forEach((step, i) => {
+            melodyPart.add(step);
+          });
+        }
+      } else if (
+        measure == melodyChangeMeasure + 1 ||
+        measure - squaresPassed * melodyChangeMeasure == 1
+      ) {
+        console.log("change back");
+        melodyPart.clear();
+
+        melodySettings.sequence.tapping.forEach((step, i) => {
+          melodyPart.add(step);
+        });
+      }
+    }
   };
 
-  handleSevenStart = () => {
-    const { alSettings } = this.state;
-    const alsampler = new Tone.Sampler({
-      urls: {
-        A1: "laugh.mp3",
-      },
-      baseUrl: "http://localhost:3000/samples/",
-    });
+  handleTransportChange = (property, value) => {
+    const { bpm } = this.state;
 
-    alChannel = new Tone.Channel(alSettings.channel);
-    alFeedbackDelay = new Tone.FeedbackDelay(alSettings.feedbackDelay);
-    alVibrato = new Tone.Vibrato(alSettings.vibrato);
-    alReverb = new Tone.Reverb(glSettings.reverb).toDestination();
-    alsampler.chain(alChannel, alVibrato, alFeedbackDelay, alReverb);
+    switch (property) {
+      case "play":
+        Tone.Transport.start();
+        Tone.Transport.scheduleRepeat(this.nextMeasure, "1m");
 
-    const alPart = new Tone.Part((time, note) => {
-      alsampler.triggerAttackRelease(
-        note.noteName,
-        note.duration,
-        time,
-        note.velocity
-      );
-    }, alSettings.sequence.steps).start(0);
+        this.setState({
+          isStarted: true,
+        });
+        break;
+      case "bpm":
+        Tone.Transport.bpm.value = value;
 
-    alPart.loopEnd = alSettings.sequence.duration;
-    alPart.loop = true;
+        this.setState({
+          bpm: value,
+        });
+        break;
+    }
   };
 
-  handleEightStart = () => {
-    const { melody2Settings } = this.state;
-    melody2Synth = new Tone.Synth(melody2Settings.synth);
+  handleValueChange = (instrumentName, property, value) => {
+    const { bassSettings, melodySettings, drumsSettings } = this.state;
 
-    melody2Channel = new Tone.Channel(melody2Settings.channel);
-    melody2Chorus = new Tone.Chorus(melody2Settings.chorus).start();
-    melody2PingPongDelay = new Tone.PingPongDelay(
-      melody2Settings.pingPongDelay
-    ).toDestination();
+    let instrument;
+    let chorus;
+    let distortion;
+    let pingPongDelay;
+    let bitCrusher;
+    let vibrato;
+    let settings;
 
-    melody2Synth.chain(melody2Channel, melody2Chorus, melody2PingPongDelay);
+    if (instrumentName === "bass") {
+      instrument = bassSynth;
+      chorus = bassChorus;
+      distortion = bassDistortion;
+      pingPongDelay = bassPingPongDelay;
+      bitCrusher = bassBitCrusher;
+      settings = bassSettings;
+    } else if (instrumentName === "melody") {
+      instrument = melodySynth;
+      chorus = melodyChorus;
+      distortion = melodyDistortion;
+      pingPongDelay = melodyPingPongDelay;
+      bitCrusher = melodyBitCrusher;
+      settings = melodySettings;
+    } else if (instrumentName === "drums") {
+      pingPongDelay = drumsPingPongDelay;
+      vibrato = drumsVibrato;
+      settings = drumsSettings;
+    }
 
-    const melody2Part = new Tone.Part((time, note) => {
-      melody2Synth.triggerAttackRelease(
-        note.noteName,
-        note.duration,
-        time,
-        note.velocity
-      );
-    }, melody2Settings.sequence.steps).start(0);
+    switch (property) {
+      case "synthType":
+        instrument.oscillator.type = value;
+        settings.synth.oscillator.type = value;
+        break;
+      case "synthShowEnvelope":
+        settings.synthUI.envelopeShow = value;
+        break;
+      case "synthEnvelopeAttack":
+        instrument.envelope.attack = value;
+        settings.synth.envelope.attack = value;
+        break;
+      case "synthEnvelopeDecay":
+        instrument.envelope.decay = value;
+        settings.synth.envelope.decay = value;
+        break;
+      case "synthEnvelopeSustain":
+        instrument.envelope.sustain = value;
+        settings.synth.envelope.sustain = value;
+        break;
+      case "synthEnvelopeRelease":
+        instrument.envelope.release = value;
+        settings.synth.envelope.release = value;
+        break;
+      case "chorusWet":
+        chorus.wet.value = value;
+        settings.chorus.wet = value;
+        break;
+      case "chorusType":
+        chorus.type = value;
+        settings.chorus.type = value;
+        break;
+      case "chorusFrequency":
+        chorus.frequency.value = value;
+        settings.chorus.frequency = value;
+        break;
+      case "chorusDelayTime":
+        chorus.delayTime = value;
+        settings.chorus.delayTime = value;
+        break;
+      case "chorusDepth":
+        chorus.depth = value;
+        settings.chorus.depth = value;
+        break;
+      case "chorusSpread":
+        chorus.spread = value;
+        settings.chorus.spread = value;
+        break;
+      case "distortionWet":
+        distortion.wet.value = value;
+        settings.distortion.wet = value;
+        break;
+      case "distortionDistortion":
+        distortion.distortion = value;
+        settings.distortion.distortion = value;
+        break;
+      case "distortionOversample":
+        distortion.oversample = value;
+        settings.distortion.oversample = value;
+        break;
 
-    melody2Part.loopEnd = melody2Settings.sequence.duration;
-    melody2Part.loop = true;
-  };
+      case "vibratoWet":
+        vibrato.wet.value = value;
+        settings.vibrato.wet = value;
+        break;
+      case "vibratoMaxDelay":
+        vibrato.maxDelay = value;
+        settings.vibrato.maxDelay = value;
+        break;
+      case "typeTypes":
+        vibrato.type = value;
+        settings.vibrato.type = value;
+        break;
 
-  handleNineStart = () => {
-    const { windSettings } = this.state;
-    const windsampler = new Tone.Sampler({
-      urls: {
-        A1: "iswind.mp3",
-      },
-      baseUrl: "http://localhost:3000/samples/",
-    });
-
-    windChannel = new Tone.Channel(windSettings.channel);
-
-    windPingPongDelay = new Tone.PingPongDelay(
-      windSettings.pingPongDelay
-    ).toDestination();
-
-    windsampler.chain(windChannel, windPingPongDelay);
-
-    const windPart = new Tone.Part((time, note) => {
-      windsampler.triggerAttackRelease(
-        note.noteName,
-        note.duration,
-        time,
-        note.velocity
-      );
-    }, windSettings.sequence.steps).start(0);
-
-    windPart.loopEnd = windSettings.sequence.duration;
-    windPart.loop = true;
-  };
-
-  handleTenStart = () => {
-    const { ipSettings } = this.state;
-    const ipsampler = new Tone.Sampler({
-      urls: {
-        A1: "world.mp3",
-      },
-      baseUrl: "http://localhost:3000/samples/",
-    });
-
-    ipChannel = new Tone.Channel(ipSettings.channel);
-
-    ipPingPongDelay = new Tone.PingPongDelay(ipSettings.pingPongDelay);
-    ipChorus = new Tone.Chorus(ipSettings.chorus).toDestination();
-
-    ipsampler.chain(ipChannel, ipPingPongDelay, ipChorus);
-
-    const ipPart = new Tone.Part((time, note) => {
-      ipsampler.triggerAttackRelease(
-        note.noteName,
-        note.duration,
-        time,
-        note.velocity
-      );
-    }, ipSettings.sequence.steps).start(0);
-
-    ipPart.loopEnd = georgianSettings.sequence.duration;
-    ipPart.loop = true;
-  };
-
-  handleElevenStart = () => {
-    const { ilSettings } = this.state;
-    const ilsampler = new Tone.Sampler({
-      urls: {
-        A1: "hava.mp3",
-      },
-      baseUrl: "http://localhost:3000/samples/",
-    });
-
-    ilChannel = new Tone.Channel(ilSettings.channel);
-    ilReverb = new Tone.Reverb(ilSettings.reverb);
-    ilChorus = new Tone.Chorus(ilSettings.chorus);
-    ilChebyshev = new Tone.Chebyshev(ilSettings.chebyshev).toDestination();
-
-    ilsampler.chain(ilChannel, ilReverb, ilChorus, ilChebyshev);
-
-    const ilPart = new Tone.Part((time, note) => {
-      ilsampler.triggerAttackRelease(
-        note.noteName,
-        note.duration,
-        time,
-        note.velocity
-      );
-    }, ilSettings.sequence.steps).start(0);
-
-    ilPart.loopEnd = ilSettings.sequence.duration;
-    ilPart.loop = true;
-  };
-
-  handleTwelveStart = () => {
-    const { melody3Settings } = this.state;
-    melody3Synth = new Tone.Synth(melody3Settings.synth);
-
-    melody3Channel = new Tone.Channel(melody3Settings.channel);
-    melody3Chorus = new Tone.Chorus(melody3Settings.chorus);
-    melody3Distortion = new Tone.Distortion(melody3Settings.distortion);
-    melody3PingPongDelay = new Tone.PingPongDelay(
-      melody3Settings.pingPongDelay
-    ).toDestination();
-
-    melody3Synth.chain(
-      melody3Channel,
-      melody3Chorus,
-      melody3Distortion,
-      melody3PingPongDelay
-    );
-
-    const melody3Part = new Tone.Part((time, note) => {
-      melody3Synth.triggerAttackRelease(
-        note.noteName,
-        note.duration,
-        time,
-        note.velocity
-      );
-    }, melody3Settings.sequence.steps).start(0);
-
-    melody3Part.loopEnd = melody3Settings.sequence.duration;
-    melody3Part.loop = true;
-  };
-
-  handleSeaValueChange = (property, value) => {
-    const { seaSettings } = this.state;
-
-    if (property === "channelVolume") {
-      seasamplerChannel.volume.value = value;
-      seaSettings.channel.volume = value;
-    } else if (property === "channelPan") {
-      seasamplerChannel.pan.value = value;
-      seaSettings.channel.pan = value;
-    } else if (property === "pingPongDelayWet") {
-      seasamplerPingPongDelay.wet.value = value;
-      seaSettings.pingPongDelay.wet = value;
+      case "bitCrusherWet":
+        bitCrusher.wet.value = value;
+        settings.bitCrusher.wet = value;
+        break;
+      case "bitCrusherBits":
+        bitCrusher.bits = value;
+        settings.bitCrusher.bits = value;
+        break;
+      case "pingPongDelayWet":
+        pingPongDelay.wet.value = value;
+        settings.pingPongDelay.wet = value;
+        break;
+      case "pingPongDelayDelayTime":
+        pingPongDelay.delayTime.value = value;
+        settings.pingPongDelay.delayTime = value;
+        break;
+      case "pingPongDelayMaxDelayTime":
+        pingPongDelay.maxDelayTime = value;
+        settings.pingPongDelay.maxDelayTime = value;
+        break;
     }
 
     this.setState({
-      seaSettings,
+      bassSettings,
+      melodySettings,
     });
   };
 
-  handleGeorgianValueChange = (property, value) => {
-    const { georgianSettings } = this.state;
+  handleMelodySoundPresetChange = (property, value) => {
+    const { melodySettings } = this.state;
+    const preset = melodySettings.presets[value];
 
-    if (property === "channelVolume") {
-      georgiansamplerChannel.volume.value = value;
-      georgianSettings.channel.volume = value;
-    } else if (property === "channelPan") {
-      georgiansamplerChannel.pan.value = value;
-      georgianSettings.channel.pan = value;
-    } else if (property === "chorusWet") {
-      georgiansamplerChorus.wet.value = value;
-      georgianSettings.chorus.wet = value;
-    }
+    const instrument = melodySynth;
+    const chorus = melodyChorus;
+    const distortion = melodyDistortion;
+    const pingPongDelay = melodyPingPongDelay;
+    const bitCrusher = melodyBitCrusher;
+    const settings = melodySettings;
+
+    const { oscillator, envelope } = preset.synth;
+
+    instrument.oscillator.type = oscillator.type;
+    settings.synth.oscillator.type = oscillator.type;
+
+    instrument.envelope.attack = envelope.attack;
+    settings.synth.envelope.attack = envelope.attack;
+
+    instrument.envelope.decay = envelope.decay;
+    settings.synth.envelope.decay = envelope.decay;
+
+    instrument.envelope.sustain = envelope.sustain;
+    settings.synth.envelope.sustain = envelope.sustain;
+
+    instrument.envelope.release = envelope.release;
+    settings.synth.envelope.release = envelope.release;
+
+    chorus.wet.value = preset.chorus.wet;
+    settings.chorus.wet = preset.chorus.wet;
+
+    chorus.type = preset.chorus.type;
+    settings.chorus.type = preset.chorus.type;
+
+    chorus.frequency.value = preset.chorus.frequency;
+    settings.chorus.frequency = preset.chorus.frequency;
+
+    chorus.delayTime = preset.chorus.delayTime;
+    settings.chorus.delayTime = preset.chorus.delayTime;
+
+    chorus.depth = preset.chorus.depth;
+    settings.chorus.depth = preset.chorus.depth;
+
+    chorus.spread = preset.chorus.spread;
+    settings.chorus.spread = preset.chorus.spread;
+
+    distortion.wet.value = preset.distortion.wet;
+    settings.distortion.wet = preset.distortion.wet;
+
+    distortion.distortion = preset.distortion.distortion;
+    settings.distortion.distortion = preset.distortion.distortion;
+
+    distortion.oversample = preset.distortion.oversample;
+    settings.distortion.oversample = preset.distortion.oversample;
+
+    bitCrusher.wet.value = preset.bitCrusher.wet;
+    settings.bitCrusher.wet = preset.bitCrusher.wet;
+
+    bitCrusher.bits = preset.bitCrusher.bits;
+    settings.bitCrusher.bits = preset.bitCrusher.bits;
+
+    pingPongDelay.wet.value = preset.pingPongDelay.wet;
+    settings.pingPongDelay.wet = preset.pingPongDelay.wet;
+
+    pingPongDelay.delayTime.value = preset.pingPongDelay.delayTime;
+    settings.pingPongDelay.delayTime = preset.pingPongDelay.delayTime;
+
+    pingPongDelay.maxDelayTime = preset.pingPongDelay.maxDelayTime;
+    settings.pingPongDelay.maxDelayTime = preset.pingPongDelay.maxDelayTime;
+
+    settings.presets.current = value;
 
     this.setState({
-      georgianSettings,
+      melodySettings,
     });
   };
 
-  handleIpValueChange = (property, value) => {
-    const { ipSettings } = this.state;
+  handleMelodySequenceChange = (property, value) => {
+    const { melodySettings } = this.state;
+    const steps = melodySettings.sequence[value];
 
-    if (property === "channelVolume") {
-      ipChannel.volume.value = value;
-      ipSettings.channel.volume = value;
-    } else if (property === "channelPan") {
-      ipChannel.pan.value = value;
-      ipSettings.channel.pan = value;
-    } else if (property === "chorusWet") {
-      ipChorus.wet.value = value;
-      ipSettings.chorus.wet = value;
-    }
+    melodySettings.sequence.current = value;
+    melodyPart.clear();
 
-    this.setState({
-      ipSettings,
+    steps.forEach((step, i) => {
+      melodyPart.add(step);
     });
-  };
-
-  handleGlValueChange = (property, value) => {
-    const { glSettings } = this.state;
-
-    if (property === "channelVolume") {
-      glChannel.volume.value = value;
-      glSettings.channel.volume = value;
-    } else if (property === "channelPan") {
-      glChannel.pan.value = value;
-      glSettings.channel.pan = value;
-    } else if (property === "chebyshevWet") {
-      glChebyshev.wet.value = value;
-      glSettings.chebyshev.wet = value;
-    } else if (property === "reverbWet") {
-      glReverb.wet.value = value;
-      glSettings.reverb.wet = value;
-    } else if (property === "vibrato") {
-      glVibrato.depth.value = value;
-      glSettings.vibrato.depth = value;
-    }
 
     this.setState({
-      glSettings,
+      melodySettings,
     });
   };
 
   handleMelodyValueChange = (property, value) => {
     const { melodySettings } = this.state;
 
-    if (property === "synthType") {
-      melodySynth.oscillator.type = value;
-      melodySettings.synth.oscillator.type = value;
-    } else if (property === "pingPongDelayWet") {
-      melodyPingPongDelay.wet.value = value;
-      melodySettings.pingPongDelay.wet = value;
-    } else if (property === "chorusWet") {
-      melodyChorus.wet.value = value;
-      melodySettings.chorus.wet = value;
-    } else if (property === "synthEnvelopeAttack") {
-      melodySynth.envelope.attack = value;
-      melodySettings.synth.envelope.attack = value;
-    } else if (property === "synthEnvelopeDecay") {
-      melodySynth.envelope.decay = value;
-      melodySettings.synth.envelope.decay = value;
-    } else if (property === "synthEnvelopeSustain") {
-      melodySynth.envelope.sustain = value;
-      melodySettings.synth.envelope.sustain = value;
-    } else if (property === "synthEnvelopeRelease") {
-      melodySynth.envelope.release = value;
-      melodySettings.synth.envelope.release = value;
-    } else if (property === "channelVolume") {
+    if (property === "channelVolume") {
       melodyChannel.volume.value = value;
       melodySettings.channel.volume = value;
-    } else if (property === "channelPan") {
-      melodyChannel.pan.value = value;
-      melodySettings.channel.pan = value;
+    } else if (property === "channelMute") {
+      console.log(
+        "=====BEFORE=====",
+        melodySettings.channel.mute,
+        melodyChannel.mute,
+        melodySettings.channel.mute,
+        melodyChannel
+      );
+
+      const mute = !melodySettings.channel.mute;
+      melodyChannel.mute = mute;
+      melodySettings.channel.mute = mute;
+
+      console.log(
+        "=====AFTER=====",
+        mute,
+        melodyChannel.mute,
+        melodySettings.channel.mute,
+        melodyChannel
+      );
     }
 
     this.setState({
@@ -569,545 +611,337 @@ export default class Container extends Component {
     });
   };
 
-  handleTreeValueChange = (property, value) => {
-    const { treeSettings } = this.state;
+  handleDrumsValueChange = (property, value) => {
+    const { drumsSettings } = this.state;
 
     if (property === "channelVolume") {
-      treeChannel.volume.value = value;
-      treeSettings.channel.volume = value;
-    } else if (property === "channelPan") {
-      treeChannel.pan.value = value;
-      treeSettings.channel.pan = value;
+      samplerChannel.volume.value = value;
+      drumsSettings.channel.volume = value;
+    } else if (property === "channelMute") {
+      console.log(
+        "=====BEFORE=====",
+        drumsSettings.channel.mute,
+        samplerChannel.mute,
+        drumsSettings.channel.mute,
+        samplerChannel
+      );
+
+      const mute = !drumsSettings.channel.mute;
+      samplerChannel.mute = mute;
+      drumsSettings.channel.mute = mute;
+
+      console.log(
+        "=====AFTER=====",
+        mute,
+        samplerChannel.mute,
+        drumsSettings.channel.mute,
+        samplerChannel
+      );
     }
 
     this.setState({
-      treeSettings,
+      drumsSettings,
     });
   };
 
-  handleApValueChange = (property, value) => {
-    const { apSettings } = this.state;
-
-    if (property === "channelVolume") {
-      apChannel.volume.value = value;
-      apSettings.channel.volume = value;
-    } else if (property === "channelPan") {
-      apChannel.pan.value = value;
-      apSettings.channel.pan = value;
-    }
-
-    this.setState({
-      apSettings,
-    });
-  };
-
-  handleAlValueChange = (property, value) => {
-    const { alSettings } = this.state;
-
-    if (property === "channelVolume") {
-      alChannel.volume.value = value;
-      alSettings.channel.volume = value;
-    } else if (property === "channelPan") {
-      alChannel.pan.value = value;
-      alSettings.channel.pan = value;
-    } else if (property === "feedback") {
-      alFeedbackDelay.wet.value = value;
-      alSettings.feedbackDelay.wet = value;
-    } else if (property === "vibrato") {
-      alVibrato.depth.value = value;
-      alSettings.vibrato.depth = value;
-    } else if (property === "reverbWet") {
-      alReverb.wet.value = value;
-      alSettings.reverb.wet = value;
-    }
-
-    this.setState({
-      alSettings,
-    });
-  };
-
-  handleMelody2ValueChange = (property, value) => {
-    const { melody2Settings } = this.state;
+  handleBassValueChange = (property, value) => {
+    const { bassSettings } = this.state;
 
     if (property === "synthType") {
-      melody2Synth.oscillator.type = value;
-      melody2Settings.synth.oscillator.type = value;
-    } else if (property === "synthEnvelopeAttack") {
-      melody2Synth.envelope.attack = value;
-      melody2Settings.synth.envelope.attack = value;
-    } else if (property === "synthEnvelopeDecay") {
-      melody2Synth.envelope.decay = value;
-      melody2Settings.synth.envelope.decay = value;
-    } else if (property === "synthEnvelopeRelease") {
-      melody2Synth.envelope.release = value;
-      melody2Settings.synth.envelope.release = value;
-    } else if (property === "channelPan") {
-      melody2Channel.pan.value = value;
-      melody2Settings.channel.pan = value;
-    }
-
-    this.setState({
-      melody2Settings,
-    });
-  };
-
-  handleWindValueChange = (property, value) => {
-    const { windSettings } = this.state;
-
-    if (property === "channelVolume") {
-      windChannel.volume.value = value;
-      windSettings.channel.volume = value;
-    } else if (property === "channelPan") {
-      windChannel.pan.value = value;
-      windSettings.channel.pan = value;
-    } else if (property === "pingPongDelayWet") {
-      windPingPongDelay.wet.value = value;
-      windSettings.pingPongDelay.wet = value;
-    }
-
-    this.setState({
-      windSettings,
-    });
-  };
-
-  handleIlValueChange = (property, value) => {
-    const { ilSettings } = this.state;
-
-    if (property === "channelVolume") {
-      ilChannel.volume.value = value;
-      ilSettings.channel.volume = value;
-    } else if (property === "channelPan") {
-      ilChannel.pan.value = value;
-      ilSettings.channel.pan = value;
-    } else if (property === "chebyshevWet") {
-      ilChebyshev.wet.value = value;
-      ilSettings.chebyshev.wet = value;
-    } else if (property === "reverbWet") {
-      ilReverb.wet.value = value;
-      ilSettings.reverb.wet = value;
-    } else if (property === "chorusWet") {
-      ilChorus.wet.value = value;
-      ilSettings.chorus.wet = value;
-    }
-
-    this.setState({
-      ilSettings,
-    });
-  };
-
-  handleMelody3ValueChange = (property, value) => {
-    const { melody3Settings } = this.state;
-
-    if (property === "synthType") {
-      melody3Synth.oscillator.type = value;
-      melody3Settings.synth.oscillator.type = value;
+      bassSynth.oscillator.type = value;
+      bassSettings.synth.oscillator.type = value;
+    } else if (property === "bassPingPongDelayDelayTime") {
+      bassPingPongDelay.delayTime.value = value;
+      bassSettings.pingPongDelay.delayTime = value;
+    } else if (property === "bassPingPongDelayMaxDelayTime") {
+      bassPingPongDelay.maxDelayTime = value;
+      bassSettings.pingPongDelay.maxDelayTime = value;
     } else if (property === "channelVolume") {
-      melody3Channel.volume.value = value;
-      melody3Settings.channel.volume = value;
-    } else if (property === "channelPan") {
-      melody3Channel.pan.value = value;
-      melody3Settings.channel.pan = value;
-    } else if (property === "distortionWet") {
-      melody3Distortion.wet.value = value;
-      melody3Settings.distortion.wet = value;
+      bassChannel.volume.value = value;
+      bassSettings.channel.volume = value;
+    } else if (property === "channelMute") {
+      console.log(
+        "=====BEFORE=====",
+        bassSettings.channel.mute,
+        bassChannel.mute,
+        bassSettings.channel.mute,
+        bassChannel
+      );
+
+      const mute = !bassSettings.channel.mute;
+      bassChannel.mute = mute;
+      bassSettings.channel.mute = mute;
+
+      console.log(
+        "=====AFTER=====",
+        mute,
+        bassChannel.mute,
+        bassSettings.channel.mute,
+        bassChannel
+      );
     }
 
     this.setState({
-      melodySettings,
+      bassSettings,
     });
+  };
+
+  handleToggleUIShow = () => {
+    const { isUIShown } = this.state;
+
+    this.setState({
+      isUIShown: !isUIShown,
+    });
+  };
+
+  renderStartButton = () => {
+    return <SC_Button text="" handleClick={this.handleStart} />;
+  };
+
+  renderShowHideButton = () => {
+    return (
+      <div className="toggleUIButton" onClick={this.handleToggleUIShow}></div>
+    );
+  };
+
+  renderUI = () => {
+    const {
+      bpm,
+      melodyChangeMeasureSelect,
+      melodyChangeMeasure,
+      melodyChangeRandom,
+      melodyChange,
+      bassSettings,
+      melodySettings,
+      drumsSettings,
+      pOpened,
+      vOpened,
+      dOpened,
+      bOpened,
+    } = this.state;
+
+    const melodyChangeButtonText = melodyChange ? "On" : "Off";
+
+    return (
+      <div className="instrumentUI">
+        <Modal add="left" appname="Nailing">
+          <div className="b"></div>
+          <div className="drumsBox">
+            <Channel
+              settings={drumsSettings}
+              handleValueChange={this.handleDrumsValueChange}
+            />
+          </div>
+          <div>
+            <h3>Hammer it!</h3>
+            <div className="drumsBntSet">
+              <SC_Button
+                text="hammer"
+                handleClick={() => {
+                  sampler.triggerAttackRelease("A1", "1n");
+                }}
+              />
+              <SC_Button
+                text="squeezer"
+                handleClick={() => {
+                  sampler.triggerAttackRelease("A2", "1n");
+                }}
+              />
+              <SC_Button
+                text="sledge"
+                handleClick={() => {
+                  sampler.triggerAttackRelease("C1", "1n");
+                }}
+              />
+              <SC_Button
+                text="ball-peen"
+                handleClick={() => {
+                  sampler.triggerAttackRelease("A4", "1m");
+                }}
+              />
+            </div>
+          </div>
+          <PingPongDelayEffect
+            title="PingPong Delay"
+            instrumentName="drums"
+            settings={drumsSettings}
+            handleValueChange={this.handleValueChange}
+            handleToggle={this.handleToggle}
+            pOpened={pOpened}
+          />
+          <VibratoEffect
+            title="Vibrato"
+            instrumentName="drums"
+            settings={drumsSettings}
+            handleValueChange={this.handleValueChange}
+            handleToggle={this.handleToggle}
+            vOpened={vOpened}
+          />
+        </Modal>
+
+        <Modal add="middle" appname="Mixing">
+          <div className="a"></div>
+          <PPDView
+            instrumentName="bass"
+            settings={bassSettings}
+            handleValueChange={this.handleValueChange}
+          />
+          <SC_Slider
+            name="bpm"
+            min={0}
+            max={300}
+            step={1}
+            value={bpm}
+            property="bpm"
+            handleChange={(property, value) => {
+              this.handleTransportChange(property, value);
+            }}
+          />
+          <div className="PresetsWrapper">
+            <SC_ToggleButtonSet
+              name="Nailing tempo"
+              options={["tapping", "grind"]}
+              value={melodySettings.sequence.current}
+              property="melodySequence"
+              handleChange={this.handleMelodySequenceChange}
+            />
+            <SC_ToggleButtonSet
+              name="Wailing tempo"
+              options={["default", "preset1", "preset2"]}
+              value={melodySettings.presets.current}
+              property="melodySoundPreset"
+              handleChange={this.handleMelodySoundPresetChange}
+            />
+          </div>
+          <div className="SurfaceWrapper">
+            <div className="LeftDecor">
+              <p className="Decor">1.0</p>
+              <p className="Decor">0.0</p>
+            </div>
+
+            <Surface
+              minX="0"
+              maxX="1"
+              stepX="0.01"
+              valueX={bassSettings.pingPongDelay.delayTime}
+              propertyX="bassPingPongDelayDelayTime"
+              minY="0"
+              maxY="1"
+              stepY="0.01"
+              valueY={bassSettings.pingPongDelay.maxDelayTime}
+              propertyY="bassPingPongDelayMaxDelayTime"
+              handleValueChange={this.handleBassValueChange}
+            />
+            <p className="Decor">1.0</p>
+          </div>
+          <div className="SelectWrapper">
+            <Select
+              name="Change melody on: M"
+              options={[2, 4, 8, 16, 32]}
+              isOpened={melodyChangeMeasureSelect}
+              value={melodyChangeMeasure}
+              property=""
+              handleMelodyChangeMeasureSelectOpen={
+                this.handleMelodyChangeMeasureSelectOpen
+              }
+              handleChange={this.handleMelodyChangeMeasure}
+            />
+            <div className="row">
+              <SC_ToggleButton
+                text={melodyChangeButtonText}
+                isOn={melodyChange}
+                handleClick={this.handleMelodyChange}
+              />
+              <SC_ToggleButton
+                text="Random"
+                isOn={melodyChangeRandom}
+                handleClick={this.handleMelodyChangeRandom}
+              />
+            </div>
+          </div>
+          <ToneSynth
+            instrumentName="melody"
+            settings={melodySettings}
+            handleValueChange={this.handleValueChange}
+            isWave
+          />
+        </Modal>
+        <Modal appname="WELDING" add="right">
+          <div className="r"></div>
+          <Channel
+            settings={bassSettings}
+            handleValueChange={this.handleBassValueChange}
+          />
+          <ToneSynth
+            instrumentName="bass"
+            settings={bassSettings}
+            handleValueChange={this.handleValueChange}
+          />
+          <DistortionEffect
+            title="Distortion"
+            instrumentName="bass"
+            settings={bassSettings}
+            handleValueChange={this.handleValueChange}
+            handleSecondToggle={this.handleSecondToggle}
+            dOpened={dOpened}
+          />
+          <BitCrusherEffect
+            title="BitCrusher"
+            instrumentName="bass"
+            settings={bassSettings}
+            handleValueChange={this.handleValueChange}
+            handleSecondToggle={this.handleSecondToggle}
+            bOpened={bOpened}
+          />
+        </Modal>
+      </div>
+    );
   };
 
   render() {
-    const {
-      seaSettings,
-      georgianSettings,
-      melodySettings,
-      glSettings,
-      treeSettings,
-      apSettings,
-      alSettings,
-      melody2Settings,
-      windSettings,
-      ipSettings,
-      ilSettings,
-      melody3Settings,
-    } = this.state;
+    const { isStarted, isUIShown } = this.state;
 
     return (
       <div className="Container">
-        <div className="column" id="left">
-          <Modal modalid="g" add="b" modaltype="big" appname="georgia.app">
-            <div className="synth">
-              <Pan
-                settings={seaSettings}
-                handleValueChange={this.handleSeaValueChange}
-              />
-              <Play
-                handleValueChange={this.handleFirstStart}
-                type="ocean"
-                text="georg symbol"
-              />
-              <h2>symbol</h2>
+        <div className="HeaderShadow">
+          <div className="HeaderWrapper">
+            <div className="h"></div>
+            <div className="MainText">
+              <h1>Metallique</h1>
+              <p className="Note">
+                МЕХАНИЗМ ПРОИЗВЕДЁН НА ЗАВОДЕ ИМ. МЕДВЕДЕВА И ПРЕДНАЗНАЧЕН
+                ДЛЯ ГЕНЕРАЦИИ ЗВУКОВ ФАБРИКи. бЕРЕЧЬ ОТ ДЕТЕЙ И ОГНЯ.
+                НЕ УПОТРЕБЛЯТЬ ВНУТРЬ. ИСПОЛЬЗОВАТЬ, СТРОГО СЛЕДУЯ ИНСТРУКЦИИ.
+              </p>
             </div>
-            <div className="synth">
-              <Pan
-                settings={georgianSettings}
-                handleValueChange={this.handleGeorgianValueChange}
-              />
-              <Play
-                handleValueChange={this.handleSecondStart}
-                type="gperson"
-                text="georg people"
-              />
-              <h2>people</h2>
+            <div className="DecText">
+              <h3>
+                МЕХАНИЗМ ВОСПРОИЗВЕДЕНИЯ ЗВУКА&ensp;&gt;&gt;&ensp;V
+                2.0&ensp;&gt;&gt;
+              </h3>
+              <h3>Updated synth</h3>
+              <h3>ADC</h3>
             </div>
-            <div className="synth">
-              <Pan
-                settings={glSettings}
-                handleValueChange={this.handleGlValueChange}
-              />
-              <Play
-                handleValueChange={this.handleThirdStart}
-                type="gl"
-                text="georg language"
-              />
-              <h2>language</h2>
-            </div>
-            <div className="synth">
-              <Pan
-                settings={melodySettings}
-                handleValueChange={this.handleMelodyValueChange}
-              />
-              <Play
-                handleValueChange={this.handleFourthStart}
-                type="guitar"
-                text="georg guitar"
-              />
-              <h2>music</h2>
-            </div>
-          </Modal>
-          <Modal modalid="a" add="b" modaltype="big" appname="armenia.app">
-            <div className="synth">
-              <Pan
-                settings={treeSettings}
-                handleValueChange={this.handleTreeValueChange}
-              />
-              <Play
-                handleValueChange={this.handleFiveStart}
-                type="tree"
-                text="armenian symbol"
-              />
-              <h2>symbol</h2>
-            </div>
-            <div className="synth">
-              <Pan
-                settings={apSettings}
-                handleValueChange={this.handleApValueChange}
-              />
-              <Play
-                handleValueChange={this.handleSixStart}
-                type="ap"
-                text="armenian people"
-              />
-              <h2>people</h2>
-            </div>
-            <div className="synth">
-              <Pan
-                settings={alSettings}
-                handleValueChange={this.handleAlValueChange}
-              />
-              <Play
-                handleValueChange={this.handleSevenStart}
-                type="al"
-                text="armenian language"
-              />
-              <h2>language</h2>
-            </div>
-            <div className="synth">
-              <Pan
-                settings={melody2Settings}
-                handleValueChange={this.handleMelody2ValueChange}
-              />
-              <Play
-                handleValueChange={this.handleEightStart}
-                type="dudka"
-                text="dudka"
-              />
-              <h2>music</h2>
-            </div>
-          </Modal>
-          <Modal modalid="i" add="b" modaltype="big" appname="israel.app">
-            <div className="synth">
-              <Pan
-                settings={windSettings}
-                handleValueChange={this.handleWindValueChange}
-              />
-              <Play
-                handleValueChange={this.handleNineStart}
-                type="wind"
-                text="israel Symbol"
-              />
-              <h2>symbol</h2>
-            </div>
-            <div className="synth">
-              <Pan
-                settings={ipSettings}
-                handleValueChange={this.handleIpValueChange}
-              />
-              <Play
-                handleValueChange={this.handleTenStart}
-                type="ip"
-                text="israel person"
-              />
-              <h2>people</h2>
-            </div>
-            <div className="synth">
-              <Pan
-                settings={glSettings}
-                handleValueChange={this.handleIlValueChange}
-              />
-              <Play
-                handleValueChange={this.handleElevenStart}
-                type="il"
-                text="israel language"
-              />
-              <h2>language</h2>
-            </div>
-            <div className="synth">
-              <Pan
-                settings={melodySettings}
-                handleValueChange={this.handleMelody3ValueChange}
-              />
-              <Play
-                handleValueChange={this.handleTwelveStart}
-                type="baraban"
-                text="israel baraban"
-              />
-              <h2>music</h2>
-            </div>
-          </Modal>
-          <Modal
-            modalid="n"
-            mbid="notes"
-            modaltype="notemodal"
-            appname="notes.app"
-          ></Modal>
+          </div>
+          {isStarted ? this.renderShowHideButton() : this.renderStartButton()}
         </div>
-        <div className="column" id="right">
-          <Modal modalid="g" mbid="col" appname="georgia.settings">
-            <div className="row">
-              <EffectsWrapper synthname="SYMBOL">
-                <Channel
-                  settings={seaSettings}
-                  handleValueChange={this.handleSeaValueChange}
-                />
-                <Delay
-                  settings={seaSettings}
-                  handleValueChange={this.handleSeaValueChange}
-                />
-              </EffectsWrapper>
-              <EffectsWrapper synthname="PEOPLE">
-                <Channel
-                  settings={georgianSettings}
-                  handleValueChange={this.handleGeorgianValueChange}
-                />
-                <Chorus
-                  settings={georgianSettings}
-                  handleValueChange={this.handleGeorgianValueChange}
-                />
-              </EffectsWrapper>
-            </div>
-            <div className="row">
-              <EffectsWrapper synthname="LANGUAGE">
-                <div className="hor">
-                  <div className="horhor">
-                    <Channel
-                      settings={glSettings}
-                      handleValueChange={this.handleGlValueChange}
-                    />
-                    <Chebyschev
-                      settings={glSettings}
-                      handleValueChange={this.handleGlValueChange}
-                    />
-                    <Vibrato
-                      settings={glSettings}
-                      handleValueChange={this.handleGlValueChange}
-                    />
-                  </div>
-                  <div className="horhor">
-                    <h3 id="knobbing">Reverb Wet</h3>
-                    <Reverb
-                      settings={glSettings}
-                      handleValueChange={this.handleGlValueChange}
-                    />
-                  </div>
-                </div>
-              </EffectsWrapper>
-            </div>
-            <div className="row">
-              <EffectsWrapper synthname="MUSIC">
-                <div className="hor">
-                  <div className="horhor">
-                    <Channel
-                      settings={melodySettings}
-                      handleValueChange={this.handleMelodyValueChange}
-                    />
-                    <Delay
-                      settings={melodySettings}
-                      handleValueChange={this.handleMelodyValueChange}
-                    />
-                  </div>
-                  <div className="horhor">
-                    <ToneSynth
-                      settings={melodySettings}
-                      handleValueChange={this.handleMelodyValueChange}
-                    />
-                  </div>
-                </div>
-              </EffectsWrapper>
-            </div>
-          </Modal>
-          <Modal modalid="a" mbid="col" appname="armenia.settings">
-            <div className="row">
-              <EffectsWrapper synthname="SYMBOL">
-                <Channel
-                  settings={treeSettings}
-                  handleValueChange={this.handleTreeValueChange}
-                />
-              </EffectsWrapper>
-              <EffectsWrapper synthname="PEOPLE">
-                <Channel
-                  settings={apSettings}
-                  handleValueChange={this.handleApValueChange}
-                />
-              </EffectsWrapper>
-            </div>
-            <div className="row">
-              <EffectsWrapper synthname="LANGUAGE">
-                <div className="hor">
-                  <div className="horhor">
-                    <Channel
-                      settings={alSettings}
-                      handleValueChange={this.handleAlValueChange}
-                    />
-                    <FeedbackDelay
-                      settings={alSettings}
-                      handleValueChange={this.handleAlValueChange}
-                    />
-                    <Vibrato
-                      settings={alSettings}
-                      handleValueChange={this.handleAlValueChange}
-                    />
-                  </div>
-                  <div className="horhor">
-                    <h3 id="knobbing">Reverb Wet</h3>
-                    <Reverb
-                      settings={alSettings}
-                      handleValueChange={this.handleAlValueChange}
-                    />
-                  </div>
-                </div>
-              </EffectsWrapper>
-            </div>
-            <div className="row">
-              <EffectsWrapper synthname="MUSIC">
-                <div className="hor">
-                  <div className="horhor">
-                    <Envelope
-                      settings={melody2Settings}
-                      handleValueChange={this.handleMelody2ValueChange}
-                    />
-                  </div>
-                  <div className="horhor">
-                    <ToneSynth
-                      settings={melody2Settings}
-                      handleValueChange={this.handleMelody2ValueChange}
-                    />
-                  </div>
-                </div>
-              </EffectsWrapper>
-            </div>
-          </Modal>
-          <Modal modalid="i" mbid="col" appname="israel.settings">
-            <div className="row">
-              <EffectsWrapper synthname="SYMBOL">
-                <Channel
-                  settings={windSettings}
-                  handleValueChange={this.handleWindValueChange}
-                />
-                <Delay
-                  settings={windSettings}
-                  handleValueChange={this.handleWindValueChange}
-                />
-              </EffectsWrapper>
-              <EffectsWrapper synthname="PEOPLE">
-                <Channel
-                  settings={ipSettings}
-                  handleValueChange={this.handleIpValueChange}
-                />
-                <Chorus
-                  settings={ipSettings}
-                  handleValueChange={this.handleIpValueChange}
-                />
-              </EffectsWrapper>
-            </div>
-            <div className="row">
-              <EffectsWrapper synthname="LANGUAGE">
-                <div className="hor">
-                  <div className="horhor">
-                    <Channel
-                      settings={ilSettings}
-                      handleValueChange={this.handleIlValueChange}
-                    />
-                    <Chebyschev
-                      settings={ilSettings}
-                      handleValueChange={this.handleIlValueChange}
-                    />
-                    <Chorus
-                      settings={ilSettings}
-                      handleValueChange={this.handleIlValueChange}
-                    />
-                  </div>
-                  <div className="horhor">
-                    <h3 id="knobbing">Reverb Wet</h3>
-                    <Reverb
-                      settings={ilSettings}
-                      handleValueChange={this.handleIlValueChange}
-                    />
-                  </div>
-                </div>
-              </EffectsWrapper>
-            </div>
-            <div className="row">
-              <EffectsWrapper synthname="MUSIC">
-                <div className="hor">
-                  <div className="horhor">
-                    <Channel
-                      settings={melody3Settings}
-                      handleValueChange={this.handleMelody3ValueChange}
-                    />
-                    <Distortion
-                      settings={melody3Settings}
-                      handleValueChange={this.handleMelody3ValueChange}
-                    />
-                  </div>
-                  <div className="horhor">
-                    <ToneSynth
-                      settings={melody3Settings}
-                      handleValueChange={this.handleMelody3ValueChange}
-                    />
-                  </div>
-                </div>
-              </EffectsWrapper>
-            </div>
-          </Modal>
-        </div>
-        <Modal modalid="todo" mbid="notes" modaltype="todomodal"></Modal>
-        <Modal
-          modalid="title"
-          mbid="notes"
-          appname="--DIGITAL SOUND TRIP--"
-        ></Modal>
+        {isUIShown ? this.renderUI() : ""}
+        <svg
+          width="1392"
+          height="275"
+          viewBox="0 0 1392 275"
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <defs>
+            <clipPath id="maskHeader">
+              <path
+                d="M2 0H46.2558H926.269C926.741 0 927.198 0.166988 927.559 0.471417L958.441 26.5286C958.802 26.833 959.259 27 959.731 27H1054.27C1054.74 27 1055.2 26.833 1055.56 26.5286L1086.44 0.471416C1086.8 0.166988 1087.26 0 1087.73 0H1258.84C1259.27 0 1259.69 0.137443 1260.03 0.392106L1295.47 26.6079C1295.81 26.8626 1296.23 27 1296.66 27H1389C1390.1 27 1391 27.8954 1391 29V74.269C1391 74.7411 1390.83 75.1979 1390.53 75.5587L1364.47 106.441C1364.17 106.802 1364 107.259 1364 107.731V113.131C1364 115.57 1358.94 116.24 1358.09 113.954C1340.23 66.0878 1294.09 32 1240 32C1170.41 32 1114 88.4121 1114 158C1114 207.35 1142.37 250.073 1183.69 270.749C1185.66 271.734 1184.98 275 1182.78 275H952.645C952.226 275 951.817 274.868 951.477 274.623L927.523 257.377C927.183 257.132 926.774 257 926.355 257H892H788L756 230H732H700H692H660H636L604 257H500H232H128L96 230H32H0V104V32.5V2C0 0.89543 0.895431 0 2 0ZM1358.29 201.501C1359.11 199.271 1364 199.912 1364 202.288C1364 202.748 1364.16 203.193 1364.46 203.544L1390.55 234.463C1390.84 234.811 1391.01 235.248 1391.02 235.703L1391.95 272.95C1391.98 274.074 1391.07 275 1389.95 275H1297.22C1295.02 275 1294.34 271.735 1296.31 270.75C1324.83 256.479 1347.18 231.706 1358.29 201.501Z"
+                fill="#D9D9D9"
+              />
+            </clipPath>
+          </defs>
+        </svg>
       </div>
     );
   }

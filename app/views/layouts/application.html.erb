@@ -6,14 +6,15 @@
     <%= csrf_meta_tags %>
     <%= csp_meta_tag %>
     <%= favicon_link_tag asset_path('favicon.png') %>
-
     <%= stylesheet_link_tag "application", media: 'all', "data-turbo-track": "reload" %>
     <%= stylesheet_link_tag "All", media: 'all', "data-turbo-track": "reload" %>
     <%= stylesheet_link_tag "colors", media: 'all', "data-turbo-track": "reload" %>
     <%= javascript_pack_tag "SynthView" %>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto+Condensed:ital,wght@0,300;0,400;0,700;1,300;1,400;1,700&display=swap" rel="stylesheet">
   </head>
-
   <body>
-  <%= yield %>
+    <%= yield %>
   </body>
 </html>
